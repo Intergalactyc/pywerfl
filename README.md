@@ -51,9 +51,10 @@ loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at 
     - Surface 3: "South" wall ("wall3") - short wall
     - Surface 4: "West" wall ("wall4") - long wall
     - Surface 5: Roof ("roof") - roof of the building
-    - Surface 6: Internal reference-pressure channels, not building surface
+    - Surface 6: Reference-pressure channels, not building surface
         - Reference pressure measured in pit about halfway between met tower and building
 - I've assumed run IDs are globally unique (so no collisions when combining sources into the same workspace)
+
 ### DesignSafe
 - At least here, there are some mislabeled taps in the "Cp File Structure" file; after some investigation of the naming structure and the unused taps in the "tap_locations" file, the correct values were identified. Corrections are made in `sources.designsafe_reference`, more details are included there in corresponding comments.
 - The downloaded dataset has a lot of redundancy (identical files included several places in the directory, confirmed to be byte-for-byte the same via hashing). This is eliminated in the transformation step done by the ingestion module, and the total dataset size is reduced by a factor of ~5.

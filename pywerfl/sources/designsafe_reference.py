@@ -79,7 +79,7 @@ def load_column_names(reference_dir: Path) -> dict[str, list[str]]:
 def load_cp_tap_ids(reference_dir: Path) -> list[str]:
     """
     Return the 206 tap IDs for cp.csv's columns, in file-column order, with CP_TAP_ID_CORRECTIONS applied.
-    Columns 1-2 are the internal reference-pressure channels (60001, 60002).
+    Columns 1-2 are the reference-pressure channels (60001, 60002).
     """
     wb = openpyxl.load_workbook(reference_dir / "column_structure.xlsx", read_only=True, data_only=True)
     tap_ids = []

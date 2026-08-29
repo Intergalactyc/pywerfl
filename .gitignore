@@ -18,6 +18,7 @@ venv*/
 !*_TEMPLATE.ini
 
 results/
+ignore/
 
 .pytest_cache
 

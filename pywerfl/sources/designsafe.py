@@ -30,7 +30,7 @@ from pywerfl.sources import designsafe_reference as reference
 SOURCE_NAME = "designsafe"
 RUN_ID_WIDTH = 4
 _EXCEL_EPOCH = datetime(1899, 12, 30)
-_INTERNAL_REFERENCE_TAPS = ("60001", "60002")
+# _REFERENCE_TAPS = ("60001", "60002")
 
 
 # --- Step 1 functions ---
@@ -147,7 +147,7 @@ def _excel_serial_to_datetime(serial: float) -> datetime:
 
 def _cp_column_names(reference_dir: Path) -> list[str]:
     tap_ids = reference.load_cp_tap_ids(reference_dir)
-    return [f"internal_{t}" if t in _INTERNAL_REFERENCE_TAPS else t for t in tap_ids]
+    return [t for t in tap_ids]
 
 
 def _read_labeled_csv(csv_path: Path, column_names: list[str]) -> pd.DataFrame:
