@@ -44,7 +44,15 @@ loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at 
 
 ## Some other notes and observations
 - So far the loader's only made to work for DesignSafe; once I have other data to work with, I'll extend it
-- Tap numbers are of the format SXXYY, where S is the surface (1=)
+- Tap numbers are of the format SXXYY, where S is the surface, XX is the x coordinate, YY is the y coordinate (coordinates in ft from origin, rounded to nearest integer)
+    - Surface 1: "North" wall ("wall1") - short wall with door
+        - Building-relative North (this just establishes building reference angle of 0 degrees)
+    - Surface 2: "East" wall ("wall2") - long wall
+    - Surface 3: "South" wall ("wall3") - short wall
+    - Surface 4: "West" wall ("wall4") - long wall
+    - Surface 5: Roof ("roof") - roof of the building
+    - Surface 6: Internal reference-pressure channels, not building surface
+        - Reference pressure measured in pit about halfway between met tower and building
 - I've assumed run IDs are globally unique (so no collisions when combining sources into the same workspace)
 ### DesignSafe
 - At least here, there are some mislabeled taps in the "Cp File Structure" file; after some investigation of the naming structure and the unused taps in the "tap_locations" file, the correct values were identified. Corrections are made in `sources.designsafe_reference`, more details are included there in corresponding comments.
