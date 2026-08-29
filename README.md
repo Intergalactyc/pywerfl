@@ -15,28 +15,31 @@ Make sure to update `yourusername` to reflect your TACC username, and change `de
 
 ## Data Transformation
 
-`pywerfl` supports multiple raw data sources, each with its own ingestion module under `pywerfl.sources`, all resulting in the same "analysis-ready" format.
+`pywerfl` supports multiple raw data sources, each with its own ingestion module under `pywerfl.sources`, all resulting in the same "analysis-ready" format. All sources write into the same shared workspace: by default `~/.pywerfl`; set the `PYWERFL_DATA_DIR` environment variable to use a different location instead, or pass an explicit workspace path as a second argument to override it for one call.
 
 For a DesignSafe PRJ-1331 download:
 ```bash
-python -m pywerfl.sources.designsafe <raw_download_dir>
+python -m pywerfl.sources.designsafe <raw_download_dir> [workspace]     # writes to (a) `workspace`, if specified, or (b) $PYWERFL_DATA_DIR, if existing, or (c) ~/.pywerfl, default
 ```
 
 ## Data Loading
-Regardless of which source produced a given run, once it has been ingested into some directory
+Regardless of which source produced a given run, and using the same default/override workspace resolution as ingestion:
 
 ```python
 from pywerfl import loader
 
-run = loader.load_run("<analysis_ready_dir>", "1851")    # For example, to load run number 1851
-run.cp                                                    # pressure coefficients, columns = tap IDs, indexed by elapsed_seconds
-run.met, run.sonic, run.tower                             # meteorological / sonic / tower-anemometry data
-run.metadata                                              # date, mean wind speed/direction, angle of attack, building position
+run = loader.load_run("1851")     # loads run number 1851 from $PYWERFL_DATA_DIR/analysis_ready (or ~/.pywerfl/analysis_ready)
+run.cp                            # pressure coefficients, columns = tap IDs, indexed by elapsed_seconds
+run.met, run.sonic, run.tower     # meteorological / sonic / tower-anemometry data
+run.metadata                      # date, mean wind speed/direction, angle of attack, building position
+
+loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at an explicit workspace
 ```
 
 ## Some other notes and observations
 - So far the loader's only made to work for DesignSafe; once I have other data to work with, I'll extend it
 - Tap numbers are of the format SXXYY, where S is the surface (1=)
+- I've assumed run IDs are globally unique (so no collisions when combining sources into the same workspace)
 ### DesignSafe
 - At least here, there are some mislabeled taps in the "Cp File Structure" file; after some investigation of the naming structure and the unused taps in the "tap_locations" file, the correct values were identified. Corrections are made in `sources.designsafe_reference`, more details are included there in corresponding comments.
 - The downloaded dataset has a lot of redundancy (identical files included several places in the directory, confirmed to be byte-for-byte the same via hashing). This is eliminated in the transformation step done by the ingestion module, and the total dataset size is reduced by a factor of ~5.

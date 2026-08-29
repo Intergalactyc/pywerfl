@@ -6,7 +6,9 @@ Ingest a raw DesignSafe WERFL PRJ-1331 download into the shared analysis-ready f
     2. Label columns, apply tap-ID corrections, build time index, and write analysis-ready Parquet
 
 Usage:
-    python -m pywerfl.sources.designsafe <raw_source_dir> [--overwrite]
+    python -m pywerfl.sources.designsafe <raw_source_dir> [workspace_dir] [--overwrite]
+
+workspace_dir defaults to $PYWERFL_DATA_DIR, or ~/.pywerfl if that's unset.
 """
 
 from __future__ import annotations
@@ -22,9 +24,10 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 
-from pywerfl import write_data
+from pywerfl import workspace, write_data
 from pywerfl.sources import designsafe_reference as reference
 
+SOURCE_NAME = "designsafe"
 RUN_ID_WIDTH = 4
 _EXCEL_EPOCH = datetime(1899, 12, 30)
 _INTERNAL_REFERENCE_TAPS = ("60001", "60002")
@@ -128,7 +131,7 @@ def clean_runs(layout: dict, run_ids: list[str], clean_dir: Path, log: Transform
 
 
 def clean_reference(layout: dict, clean_dir: Path, log: TransformLog) -> None:
-    ref = clean_dir / "reference"
+    ref = clean_dir / f"{SOURCE_NAME}_reference"
     copy_file(layout["project_metadata"], ref / "project_metadata.json", log)
     copy_file(find_one(layout["file_structure"], "*.xlsx"), ref / "column_structure.xlsx", log)
     copy_file(find_one(layout["tap_locations"], "*.xlsx"), ref / "tap_locations.xlsx", log)
@@ -176,7 +179,7 @@ def _load_run_metadata(stats_path: Path, run_id: str) -> dict:
 
     return {
         "run_id": run_id,
-        "source": "designsafe",
+        "source": SOURCE_NAME,
         "mode": fields.get("Mode"),
         "date_time": date_time,
         "mean_wind_speed_mph": fields.get("Mean Wind Speed"),
@@ -208,37 +211,55 @@ def transform_run(
 
 # --- CLI ---
 
+def _existing_run_conflicts(run_ids: list[str], clean_dir: Path, analysis_ready_dir: Path) -> list[str]:
+    conflicts = []
+    for run_id in run_ids:
+        padded_id = padded_run_id(run_id)
+        clean_run_exists = (clean_dir / "runs" / clean_run_dirname(run_id)).exists()
+        analysis_ready_run_exists = (analysis_ready_dir / f"run_{padded_id}").exists()
+        if clean_run_exists or analysis_ready_run_exists:
+            conflicts.append(padded_id)
+    return conflicts
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("source", type=Path, help="Root of the raw downloaded PRJ-1331 dataset")
-    parser.add_argument("--overwrite", action="store_true", help="Replace existing output directories")
+    parser.add_argument(
+        "workspace", type=Path, nargs="?", default=None,
+        help=f"Shared output directory (default: ${workspace.ENV_VAR} or {workspace.DEFAULT})",
+    )
+    parser.add_argument("--overwrite", action="store_true", help="Refresh this invocation's runs if they already exist in the workspace")
     args = parser.parse_args()
 
     source: Path = args.source.resolve()
     if not source.is_dir():
         parser.error(f"Source directory does not exist: {source}")
 
-    clean_dir = source.with_name(f"{source.name}-clean")
-    analysis_ready_dir = source.with_name(f"{source.name}-analysis-ready")
+    ws: Path = args.workspace.resolve() if args.workspace is not None else workspace.default_workspace()
+    clean_dir = ws / "clean"
+    analysis_ready_dir = ws / "analysis_ready"
 
-    for output in (clean_dir, analysis_ready_dir):
-        if output.exists():
-            if not args.overwrite:
-                parser.error(f"Output directory already exists: {output} (use --overwrite to refresh it)")
-            shutil.rmtree(output)
-    clean_dir.mkdir(parents=True)
-    analysis_ready_dir.mkdir(parents=True)
-
-    # --- Step 1 ---
-    log = TransformLog()
     layout = locate_source_layout(source)
     run_ids = discover_run_ids(layout["publication_time_histories"])
     print(f"Discovered {len(run_ids)} runs: {', '.join(run_ids)}")
 
+    conflicts = _existing_run_conflicts(run_ids, clean_dir, analysis_ready_dir)
+    if conflicts and not args.overwrite:
+        parser.error(
+            f"{len(conflicts)} run(s) already exist in {ws}: {', '.join(conflicts)} "
+            "(use --overwrite to refresh them)"
+        )
+
+    clean_dir.mkdir(parents=True, exist_ok=True)
+    analysis_ready_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Step 1 ---
+    log = TransformLog()
     clean_runs(layout, run_ids, clean_dir, log)
     clean_reference(layout, clean_dir, log)
 
-    log_path = clean_dir / "transform_log.json"
+    log_path = clean_dir / f"{SOURCE_NAME}_transform_log.json"
     log_path.write_text(json.dumps({
         "source": str(source),
         "output": str(clean_dir),
@@ -251,19 +272,19 @@ def main() -> None:
     print(f"Cleaned structure: copied {len(log.copied)} files to {clean_dir} ({len(log.warnings)} warnings)")
 
     # --- Step 2 ---
-    reference_dir = clean_dir / "reference"
+    reference_dir = clean_dir / f"{SOURCE_NAME}_reference"
     column_names = reference.load_column_names(reference_dir)
     cp_columns = _cp_column_names(reference_dir)
 
     tap_locations = reference.load_tap_locations(reference_dir)
-    tap_locations.to_csv(analysis_ready_dir / "tap_locations.csv", index=False)
+    tap_locations.to_csv(analysis_ready_dir / f"{SOURCE_NAME}_tap_locations.csv", index=False)
 
     print(f"Transforming {len(run_ids)} runs...")
     for run_id in run_ids:
         transform_run(clean_dir, analysis_ready_dir, run_id, column_names, cp_columns)
 
     print(f"\nDone. Wrote clean structure to {clean_dir}")
-    print(f"Wrote {len(run_ids)} runs + tap_locations.csv to {analysis_ready_dir}")
+    print(f"Wrote {len(run_ids)} runs + {SOURCE_NAME}_tap_locations.csv to {analysis_ready_dir}")
 
 
 if __name__ == "__main__":
