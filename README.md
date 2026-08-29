@@ -1,7 +1,13 @@
 # PyWERFL
 Python library to aid in analysis of data from the [TTU Wind Engineering Research Field Laboratory (WERFL)](https://www.depts.ttu.edu/nwi/research/facilities/WERFL.php).
 
-<INSTALL INSTRUCTIONS HERE>
+## Installation
+
+From a clone of this repo:
+```bash
+pip install -e .
+```
+This installs the package with its dependencies, and a `pywerfl-designsafe` console command equivalent to `python -m pywerfl.sources.designsafe`.
 
 ## Data Access
 ### DesignSafe
@@ -28,7 +34,7 @@ Regardless of which source produced a given run, and using the same default/over
 ```python
 from pywerfl import loader
 
-run = loader.load_run("1851")     # loads run number 1851 from $PYWERFL_DATA_DIR/analysis_ready (or ~/.pywerfl/analysis_ready)
+run = loader.load_run("1851")     # loads run number 1851 from ingested analysis-ready data
 run.cp                            # pressure coefficients, columns = tap IDs, indexed by elapsed_seconds
 run.met, run.sonic, run.tower     # meteorological / sonic / tower-anemometry data
 run.metadata                      # date, mean wind speed/direction, angle of attack, building position
