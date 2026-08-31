@@ -7,7 +7,7 @@ From a clone of this repo:
 ```bash
 pip install -e .
 ```
-This installs the package with its dependencies, and a `pywerfl-designsafe` console command equivalent to `python -m pywerfl.sources.designsafe`.
+This installs the package with its dependencies, and `pywerfl-designsafe`/`pywerfl-onerunsimple` console commands equivalent to `python -m pywerfl.sources.designsafe`/`python -m pywerfl.sources.onerunsimple`.
 
 ## Data Access
 ### DesignSafe
@@ -23,10 +23,19 @@ Make sure to update `yourusername` to reflect your TACC username, and change `de
 
 `pywerfl` supports multiple raw data sources, each with its own ingestion module under `pywerfl.sources`, all resulting in the same "analysis-ready" format. All sources write into the same shared workspace: by default `~/.pywerfl`; set the `PYWERFL_DATA_DIR` environment variable to use a different location instead, or pass an explicit workspace path as a second argument to override it for one call.
 
-For a DesignSafe PRJ-1331 download:
+For a DesignSafe project download (e.g. PRJ-1331):
 ```bash
 python -m pywerfl.sources.designsafe <raw_download_dir> [workspace]     # writes to (a) `workspace`, if specified, or (b) $PYWERFL_DATA_DIR, if existing, or (c) ~/.pywerfl, default
 ```
+
+For a single-run, already-flat, headered-CSV dataset (e.g. R647):
+```bash
+python -m pywerfl.sources.onerunsimple <run_dir> [workspace]
+```
+
+### Unit and naming convention
+
+Every source converts its own raw units into a fixed SI-based set on ingestion, via `pywerfl.units`/`pywerfl.schema`: wind speeds in m/s, temperatures in K, pressures in kPa, lengths in m, angles in degrees, relative humidity and turbulence intensity as a fraction (0-1), Cp and related quantities dimensionless. Column names carry no unit suffix (the unit is always whatever's listed above) and are the same across sources for the same measurement. A table or tap may simply be absent for a source/run that doesn't measure it. met/sonic instrument height and tower's per-height mapping live in `run.metadata` (`met_height_m`, `sonic_height_m`, `tower_heights_m`) rather than in column names, since met/sonic are each a single location per table.
 
 ## Data Loading
 Regardless of which source produced a given run, and using the same default/override workspace resolution as ingestion:
@@ -34,16 +43,22 @@ Regardless of which source produced a given run, and using the same default/over
 ```python
 from pywerfl import loader
 
-run = loader.load_run("1851")     # loads run number 1851 from ingested analysis-ready data
-run.cp                            # pressure coefficients, columns = tap IDs, indexed by elapsed_seconds
+run = loader.load_run("1851")           # loads run number 1851 from ingested analysis-ready data
+
+# Example data access:
+run.cp                                  # pressure coefficients, columns = tap IDs, indexed by elapsed_seconds
 run.met, run.sonic, run.tower     # meteorological / sonic / tower-anemometry data
-run.metadata                      # date, mean wind speed/direction, angle of attack, building position
+run.met.temperature                     # K
+run.sonic.wind_speed                    # m/s
+run.tower["13ft_wind_speed"]            # m/s
+run.metadata                            # mean wind speed/direction, angle of attack, instrument heights, ...
 
 loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at an explicit workspace
 ```
 
 ## Some other notes and observations
-- So far the loader's only made to work for DesignSafe; once I have other data to work with, I'll extend it
+- Tap coordinates (`pywerfl.reference_data`) are fixed and bundled with the
+  package; which taps are actually instrumented (i.e. present as columns) can still vary by source/run
 - Tap numbers are of the format SXXYY, where S is the surface, XX is the x coordinate, YY is the y coordinate (coordinates in ft from origin, rounded to nearest integer)
     - Surface 1: "North" wall ("wall1") - short wall with door
         - Building-relative North (this just establishes building reference angle of 0 degrees)
@@ -53,8 +68,14 @@ loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at 
     - Surface 5: Roof ("roof") - roof of the building
     - Surface 6: Reference-pressure channels, not building surface
         - Reference pressure measured in pit about halfway between met tower and building
-- I've assumed run IDs are globally unique (so no collisions when combining sources into the same workspace)
+- I've assumed run IDs are globally unique (so there should be no collisions when combining sources into the same workspace)
 
 ### DesignSafe
 - At least here, there are some mislabeled taps in the "Cp File Structure" file; after some investigation of the naming structure and the unused taps in the "tap_locations" file, the correct values were identified. Corrections are made in `sources.designsafe_reference`, more details are included there in corresponding comments.
 - The downloaded dataset has a lot of redundancy (identical files included several places in the directory, confirmed to be byte-for-byte the same via hashing). This is eliminated in the transformation step done by the ingestion module, and the total dataset size is reduced by a factor of ~5.
+
+### onerunsimple
+- For single-run datasets already saved as flat, headered CSVs (e.g. R647) -- no reference workbook or clean/ intermediate needed, so this source's ingestion is a single pass to analysis-ready format.
+- Unclear what ZoTurb, ShearVelocity, and FlowPara.Alpha are
+    - ShearVelocity disagrees with FlowPara.Ustar
+    - FlowPara.Alpha is ~7.6, unusually large to be a WSC
