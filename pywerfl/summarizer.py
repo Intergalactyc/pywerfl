@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from pywerfl import circular
+from pywerfl import circular, schema
 from pywerfl.loader import Run
 
 _DIRECTION_NAME = "wind_direction"
@@ -26,10 +26,6 @@ class RunSummary:
             raise AttributeError(
                 f"RunSummary {self.run_id!r} has no table {name!r}; available: {sorted(self.tables)}"
             ) from None
-
-
-def _is_direction_column(name: str) -> bool:
-    return name == _DIRECTION_NAME or name.endswith(f"_{_DIRECTION_NAME}")
 
 
 def _paired_speed_column(name: str) -> str:
@@ -66,7 +62,7 @@ def _direction_stats(direction: pd.Series, speed: pd.Series | None) -> dict:
 def _summarize_table(df: pd.DataFrame) -> pd.DataFrame:
     rows = {}
     for name in df.columns:
-        if _is_direction_column(name):
+        if schema.is_direction_column(name):
             speed_col = _paired_speed_column(name)
             speed = df[speed_col] if speed_col in df.columns else None
             rows[name] = _direction_stats(df[name], speed)

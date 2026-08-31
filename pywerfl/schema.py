@@ -1,7 +1,7 @@
 """Column-naming contract for the analysis-ready format.
 
 Fixed units: wind speeds in m/s, temperatures in K,
-pressures in kPa, lengths in m, angles in degrees, relative humidity and
+pressures in kPa, lengths in m, angles in degrees (mod 360), relative humidity and
 turbulence intensity as a fraction (0-1), Cp and other dimensionless
 quantities unitless.
 
@@ -22,12 +22,22 @@ import pandas as pd
 from pywerfl import units
 
 
+_DIRECTION_NAME = "wind_direction"
+
+
+def is_direction_column(name: str) -> bool:
+    """True for wind_direction and {height}ft_wind_direction"""
+    return name == _DIRECTION_NAME or name.endswith(f"_{_DIRECTION_NAME}")
+
+
 def build_table(df: pd.DataFrame, column_spec: dict[str, tuple[str, str, str]]) -> pd.DataFrame:
     """column_spec: {source_column: (canonical_name, source_unit, canonical_unit)}"""
-    result = {
-        canonical_name: units.convert(df[src_col], source_unit, canonical_unit)
-        for src_col, (canonical_name, source_unit, canonical_unit) in column_spec.items()
-    }
+    result = {}
+    for src_col, (canonical_name, source_unit, canonical_unit) in column_spec.items():
+        values = units.convert(df[src_col], source_unit, canonical_unit)
+        if is_direction_column(canonical_name):
+            values = values % 360
+        result[canonical_name] = values
     return pd.DataFrame(result, index=df.index)
 
 

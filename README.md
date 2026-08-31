@@ -54,7 +54,7 @@ run.met.temperature                     # K
 run.sonic.wind_speed                    # m/s
 run.tower["13ft_wind_speed"]            # m/s
 run.metadata                            # mean wind speed/direction, angle of attack, instrument heights, ... (same keys for every source)
-run.derived                             # extra, source-specific fields (e.g. onerunsimple's boundary-layer flow parameters); {} if none
+run.derived                             # extra, source-specific fields
 
 loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at an explicit workspace
 ```
