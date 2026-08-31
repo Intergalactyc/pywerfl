@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from pywerfl import circular, schema
+from pywerfl import circular, extremes, schema
 from pywerfl.loader import Run
 
 _DIRECTION_NAME = "wind_direction"
@@ -59,17 +59,23 @@ def _direction_stats(direction: pd.Series, speed: pd.Series | None) -> dict:
     return stats
 
 
-def _summarize_table(df: pd.DataFrame) -> pd.DataFrame:
+def _summarize_table(df: pd.DataFrame, table_name: str, n_epochs: int) -> pd.DataFrame:
+    is_cp = table_name == "cp"
+    epoch_seconds = (df.index[1] - df.index[0]) * len(df) / n_epochs if is_cp else None
+
     rows = {}
     for name in df.columns:
         if schema.is_direction_column(name):
             speed_col = _paired_speed_column(name)
             speed = df[speed_col] if speed_col in df.columns else None
             rows[name] = _direction_stats(df[name], speed)
+        elif is_cp:
+            rows[name] = _scalar_stats(df[name]) | extremes.pressure_extremes(df[name], epoch_seconds, n_epochs) # pyright: ignore[reportArgumentType]
         else:
             rows[name] = _scalar_stats(df[name])
     return pd.DataFrame.from_dict(rows, orient="index")
 
 
-def summarize_run(run: Run) -> RunSummary:
-    return RunSummary(run_id=run.run_id, tables={name: _summarize_table(df) for name, df in run.tables.items()})
+def summarize_run(run: Run, n_epochs: int = 15) -> RunSummary:
+    tables = {name: _summarize_table(df, name, n_epochs) for name, df in run.tables.items()}
+    return RunSummary(run_id=run.run_id, tables=tables)

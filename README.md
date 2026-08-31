@@ -79,6 +79,11 @@ The function `summarizer.summarize_run` takes a `Run` object and returns a `RunS
 
 Wind-direction columns are detected automatically and get proper circular statistics. For these rows, `mean`/`std`/`skew`/`kurt` are all computed via `pywerfl.circular`, `min`/`max` are `NaN`, and an extra `vector_mean` column holds the speed-weighted true vector-average direction (paired from the matching `*_wind_speed` column, `NaN` if none exists). A helper column `is_circular` is provided to track which rows got this treatment.
 
+`summary.cp` additionally gets four record-extreme columns per tap, computed by functions in `pywerfl.extremes`: Lieblein BLUE (Best Linear Unbiased Estimator) Gumbel-distribution fit to 15 epoch extrema.
+- `iso_blue_max`/`iso_blue_min`: non-exceedance P=0.80, extrapolated to a 60-minute reference period (ISO 4354 1-hour design peak convention)
+- `exp_blue_max`/`exp_blue_min`: non-exceedance P=0.5704 (the probability at which a Gumbel variate equals the distribution's mean), extrapolated to the record's own actual duration
+    - A more statistically stable estimate of the real pressure peak over this record than the raw observed `min`/`max` values
+
 ## Some other notes and observations
 - Tap coordinates (`pywerfl.reference_data`) are fixed and bundled with the
   package; which taps are actually instrumented (i.e. present as columns) can still vary by source/run
@@ -92,6 +97,9 @@ Wind-direction columns are detected automatically and get proper circular statis
     - Surface 6: Reference-pressure channels, not building surface
         - Reference pressure measured in pit about halfway between met tower and building
 - I've assumed run IDs are globally unique (so there should be no collisions when combining sources into the same workspace)
+- When checking different sources for the BLUE coefficients, a transcription error was caught in NIST's bluecoeff.m (at n=15, a_2 = 0.119134 there vs. the correct 0.119314 used here).
+    - Compared NIST source at https://www.itl.nist.gov/div898/winds/gumbel_blue/gumbblue.htm as well as an MIT-made source at github.com/kikocorreoso/scikit-extremes
+    - Found error while cross-checking against sum(a)=1 and sum(b)=0 unbiasedness identities
 
 ### DesignSafe
 - At least here, there are some mislabeled taps in the "Cp File Structure" file; after some investigation of the naming structure and the unused taps in the "tap_locations" file, the correct values were identified. Corrections are made in `sources.designsafe_reference`, more details are included there in corresponding comments.
