@@ -59,6 +59,26 @@ run.derived                             # extra, source-specific fields (e.g. on
 loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at an explicit workspace
 ```
 
+The function `loader.load_run` loads the run from the workspace (so long as it has been ingested there) as a `Run` object.
+
+## Summarizing a run
+
+`pywerfl.summarizer.summarize_run(run)` computes summary statistics (mean/std/skew/kurt/min/max/n) for every variable in `met`/`sonic`/`tower`/`cp`:
+
+```python
+from pywerfl import loader, summarizer
+
+run = loader.load_run("1851")
+summary = summarizer.summarize_run(run)
+
+summary.sonic.loc["wind_speed"]          # mean, std, skew, kurt, min, max, n
+summary.cp.loc["13004"]                  # same, per pressure tap
+```
+
+The function `summarizer.summarize_run` takes a `Run` object and returns a `RunSummary` object.
+
+Wind-direction columns are detected automatically and get proper circular statistics. For these rows, `mean`/`std`/`skew`/`kurt` are all computed via `pywerfl.circular`, `min`/`max` are `NaN`, and an extra `vector_mean` column holds the speed-weighted true vector-average direction (paired from the matching `*_wind_speed` column, `NaN` if none exists). A helper column `is_circular` is provided to track which rows got this treatment.
+
 ## Some other notes and observations
 - Tap coordinates (`pywerfl.reference_data`) are fixed and bundled with the
   package; which taps are actually instrumented (i.e. present as columns) can still vary by source/run
