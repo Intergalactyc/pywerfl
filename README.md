@@ -75,7 +75,7 @@ loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at 
 - The downloaded dataset has a lot of redundancy (identical files included several places in the directory, confirmed to be byte-for-byte the same via hashing). This is eliminated in the transformation step done by the ingestion module, and the total dataset size is reduced by a factor of ~5.
 
 ### onerunsimple
-- For single-run datasets already saved as flat, headered CSVs (e.g. R647) -- no reference workbook or clean/ intermediate needed, so this source's ingestion is a single pass to analysis-ready format.
-- Unclear what ZoTurb, ShearVelocity, and FlowPara.Alpha are
+- For single-run datasets already saved as flat, headered CSVs (e.g. R647) - no reference workbook or clean/ intermediate needed, so this source's ingestion is a single pass to analysis-ready format.
+- `FlowPara.Alpha` is the power-law *index* n = 1/alpha, a convention used in some older literature; `power_law_alpha` is computed as its reciprocal (R647 value of ~7.6 becomes ~0.132), with the untransformed source value kept as `power_law_index_raw`.
+- Unclear what ZoTurb and ShearVelocity are
     - ShearVelocity disagrees with FlowPara.Ustar
-    - FlowPara.Alpha is ~7.6, unusually large to be a WSC

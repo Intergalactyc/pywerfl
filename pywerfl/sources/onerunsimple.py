@@ -136,7 +136,8 @@ def _load_run_metadata(flow_params_path: Path, run_id: str, tower_names: list[st
         "roughness_length_m": units.convert(p["FlowPara.ZoPro"], "ft", "m"),
         "shear_velocity_log_law_ms": units.convert(p["FlowPara.Ustar"], "mph", "m/s"),
         "log_law_r_squared": p["FlowPara.LogLaw.R2"],
-        "power_law_alpha": p["FlowPara.Alpha"],
+        "power_law_alpha": 1 / p["FlowPara.Alpha"],  # source reports power-law index n = 1/alpha
+        "power_law_index_raw": p["FlowPara.Alpha"],
         "power_law_r_squared": p["FlowPara.Power.R2"],
         "integral_length_scale_best_fit_m": units.convert(p["IntegralScale.Best.Fit"], "ft", "m"),
         "integral_length_scale_direct_m": units.convert(p["IntegralScale.Dir.Int"], "ft", "m"),
