@@ -42,9 +42,6 @@ class Run:
     tables: dict[str, pd.DataFrame] = field(repr=False)
 
     def __getattr__(self, name: str) -> pd.DataFrame:
-        # Only called when normal attribute lookup fails, so this doesn't shadow
-        # run_id/metadata/tables themselves. Lets e.g. run.cp work for any table a
-        # source happens to provide, without hardcoding sensor names here.
         try:
             return self.tables[name]
         except KeyError:
