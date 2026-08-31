@@ -29,3 +29,27 @@ def build_table(df: pd.DataFrame, column_spec: dict[str, tuple[str, str, str]]) 
         for src_col, (canonical_name, source_unit, canonical_unit) in column_spec.items()
     }
     return pd.DataFrame(result, index=df.index)
+
+
+# run.metadata contract: every source provides exactly these keys, None if not applicable.
+# Anything else a source wants to report goes in run.derived instead.
+METADATA_FIELDS = (
+    "run_id",
+    "source",
+    "mode",
+    "date_time",
+    "mean_wind_speed_ms",
+    "mean_wind_direction_deg",
+    "angle_of_attack_deg",
+    "building_position_deg",
+    "met_height_m",
+    "sonic_height_m",
+    "tower_heights_m",
+)
+
+
+def build_metadata(values: dict) -> dict:
+    extra = set(values) - set(METADATA_FIELDS)
+    if extra:
+        raise ValueError(f"unexpected metadata fields: {sorted(extra)}")
+    return {key: values.get(key) for key in METADATA_FIELDS}

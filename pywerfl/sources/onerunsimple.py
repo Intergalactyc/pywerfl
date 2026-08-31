@@ -120,14 +120,19 @@ def _load_flow_parameters(path: Path) -> dict:
     return dict(zip(headers, values))
 
 
-def _load_run_metadata(flow_params_path: Path, run_id: str, tower_names: list[str]) -> dict:
+def _load_run_metadata(flow_params_path: Path, run_id: str, tower_names: list[str]) -> tuple[dict, dict]:
     p = _load_flow_parameters(flow_params_path)
-    return {
+    metadata = schema.build_metadata({
         "run_id": run_id,
         "source": SOURCE_NAME,
         "angle_of_attack_deg": p["Angleofattack"],
         "mean_wind_speed_ms": units.convert(p["Ref.Velocity"], "mph", "m/s"),
         "mean_wind_direction_deg": p["Ref.Dir"],
+        "met_height_m": _MET_HEIGHT_M,
+        "sonic_height_m": _SONIC_HEIGHT_M,
+        "tower_heights_m": _tower_heights_m(tower_names),
+    })
+    derived = {
         "reference_temperature_k": units.convert(p["Ref.Temp"], "degF", "K"),
         "reference_pressure_kpa": units.convert(p["Ref.BarPres"], "inHg", "kPa"),
         "reference_relative_humidity": units.convert(p["Ref.RelHumid"], "%", "fraction"),
@@ -144,10 +149,8 @@ def _load_run_metadata(flow_params_path: Path, run_id: str, tower_names: list[st
         "shear_velocity_ms": units.convert(p["ShearVelocity"], "mph", "m/s"), # not entirely sure what this is, as it disagrees with FlowPara.UStar
         "turbulence_intensity": p["TurInt"],
         "roughness_length_turbulence_m": units.convert(p["ZoTurb"], "ft", "m"),
-        "met_height_m": _MET_HEIGHT_M,
-        "sonic_height_m": _SONIC_HEIGHT_M,
-        "tower_heights_m": _tower_heights_m(tower_names),
     }
+    return metadata, derived
 
 
 def main() -> None:
@@ -189,9 +192,9 @@ def main() -> None:
     }
 
     flow_params_path = find_one(run_dir, f"Run{run_number}*flow parameters.xlsx")
-    metadata = _load_run_metadata(flow_params_path, padded_id, list(tower_raw.columns))
+    metadata, derived = _load_run_metadata(flow_params_path, padded_id, list(tower_raw.columns))
 
-    write_data.write_run(analysis_ready_dir, padded_id, tables, metadata)
+    write_data.write_run(analysis_ready_dir, padded_id, tables, metadata, derived=derived)
     print(f"Wrote run {padded_id} to {analysis_ready_dir}")
 
 

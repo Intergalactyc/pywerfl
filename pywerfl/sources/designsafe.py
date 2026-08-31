@@ -226,7 +226,7 @@ def _load_run_metadata(stats_path: Path, run_id: str, tower_names: list[str]) ->
     if isinstance(date_time, datetime):
         date_time = date_time.isoformat()
 
-    return {
+    return schema.build_metadata({
         "run_id": run_id,
         "source": SOURCE_NAME,
         "mode": fields.get("Mode"),
@@ -238,7 +238,7 @@ def _load_run_metadata(stats_path: Path, run_id: str, tower_names: list[str]) ->
         "met_height_m": _MET_HEIGHT_M,
         "sonic_height_m": _SONIC_HEIGHT_M,
         "tower_heights_m": _tower_heights_m(tower_names),
-    }
+    })
 
 
 def transform_run(

@@ -37,6 +37,8 @@ python -m pywerfl.sources.onerunsimple <run_dir> [workspace]
 
 Every source converts its own raw units into a fixed SI-based set on ingestion, via `pywerfl.units`/`pywerfl.schema`: wind speeds in m/s, temperatures in K, pressures in kPa, lengths in m, angles in degrees, relative humidity and turbulence intensity as a fraction (0-1), Cp and related quantities dimensionless. Column names carry no unit suffix (the unit is always whatever's listed above) and are the same across sources for the same measurement. A table or tap may simply be absent for a source/run that doesn't measure it. met/sonic instrument height and tower's per-height mapping live in `run.metadata` (`met_height_m`, `sonic_height_m`, `tower_heights_m`) rather than in column names, since met/sonic are each a single location per table.
 
+`run.metadata` itself is a fixed contract, set in `pywerfl.schema.METADATA_FIELDS`: every source provides exactly the same set of keys, `None` for anything that doesn't apply. Anything extra a source wants to report goes in `run.derived` instead, which has no fixed key set and can be empty.
+
 ## Data Loading
 Regardless of which source produced a given run, and using the same default/override workspace resolution as ingestion:
 
@@ -47,11 +49,12 @@ run = loader.load_run("1851")           # loads run number 1851 from ingested an
 
 # Example data access:
 run.cp                                  # pressure coefficients, columns = tap IDs, indexed by elapsed_seconds
-run.met, run.sonic, run.tower     # meteorological / sonic / tower-anemometry data
+run.met, run.sonic, run.tower           # meteorological / sonic / tower-anemometry data
 run.met.temperature                     # K
 run.sonic.wind_speed                    # m/s
 run.tower["13ft_wind_speed"]            # m/s
-run.metadata                            # mean wind speed/direction, angle of attack, instrument heights, ...
+run.metadata                            # mean wind speed/direction, angle of attack, instrument heights, ... (same keys for every source)
+run.derived                             # extra, source-specific fields (e.g. onerunsimple's boundary-layer flow parameters); {} if none
 
 loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at an explicit workspace
 ```
@@ -76,6 +79,6 @@ loader.load_run("1851", "<workspace>/analysis_ready")   # alternative: point at 
 
 ### onerunsimple
 - For single-run datasets already saved as flat, headered CSVs (e.g. R647) - no reference workbook or clean/ intermediate needed, so this source's ingestion is a single pass to analysis-ready format.
-- `FlowPara.Alpha` is the power-law *index* n = 1/alpha, a convention used in some older literature; `power_law_alpha` is computed as its reciprocal (R647 value of ~7.6 becomes ~0.132), with the untransformed source value kept as `power_law_index_raw`.
+- `FlowPara.Alpha` is the power-law *index* n = 1/alpha, a convention used in some older literature; `power_law_alpha` (in `run.derived`) is computed as its reciprocal (R647 value of ~7.6 becomes ~0.132), with the untransformed source value kept as `power_law_index_raw`.
 - Unclear what ZoTurb and ShearVelocity are
     - ShearVelocity disagrees with FlowPara.Ustar

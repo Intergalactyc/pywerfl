@@ -39,6 +39,7 @@ def _resolve_run_id(run_id: int | str, analysis_ready_dir: Path) -> str:
 class Run:
     run_id: str
     metadata: dict
+    derived: dict
     tables: dict[str, pd.DataFrame] = field(repr=False)
 
     def __getattr__(self, name: str) -> pd.DataFrame:
@@ -68,5 +69,7 @@ def load_run(run_id: int | str, analysis_ready_dir: Path | None = None) -> Run:
     run_id = _resolve_run_id(run_id, analysis_ready_dir)
     run_dir = analysis_ready_dir / f"run_{run_id}"
     metadata = json.loads((run_dir / "metadata.json").read_text())
+    derived_path = run_dir / "derived.json"
+    derived = json.loads(derived_path.read_text()) if derived_path.exists() else {}
     tables = {p.stem: pd.read_parquet(p) for p in sorted(run_dir.glob("*.parquet"))}
-    return Run(run_id=run_id, metadata=metadata, tables=tables)
+    return Run(run_id=run_id, metadata=metadata, derived=derived, tables=tables)

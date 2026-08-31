@@ -8,6 +8,7 @@ data source writes it the same way:
 
     <analysis_ready_dir>/run_<run_id>/<table_name>.parquet   (one or more tables)
     <analysis_ready_dir>/run_<run_id>/metadata.json
+    <analysis_ready_dir>/run_<run_id>/derived.json           (optional)
 """
 
 from __future__ import annotations
@@ -18,16 +19,22 @@ from pathlib import Path
 import pandas as pd
 
 
-def write_run(analysis_ready_dir: Path, run_id: str, tables: dict[str, pd.DataFrame], metadata: dict) -> None:
+def write_run(
+    analysis_ready_dir: Path,
+    run_id: str,
+    tables: dict[str, pd.DataFrame],
+    metadata: dict,
+    derived: dict | None = None,
+) -> None:
     """
     Write one run's labeled tables and metadata into analysis_ready_dir/run_<run_id>/.
 
     tables: {table_name: DataFrame} - any names, any count; each is written as
         <table_name>.parquet. Different sources can provide entirely different
         table sets (e.g. different sensors) without any change here.
-    metadata: an arbitrary JSON-serializable dict, written as metadata.json.
-        "run_id" and "source" are conventional but not enforced - nothing here
-        assumes a fixed schema, since different sources will have different fields.
+    metadata: dict matching pywerfl.schema.METADATA_FIELDS exactly, written as metadata.json.
+    derived: optional extra, source-specific fields not part of the metadata contract,
+        written as derived.json if given.
 
     run_id becomes the literal run_<run_id> folder-name suffix.
     Formatting choices (e.g. zero-padding) are up to the calling source module.
@@ -39,3 +46,5 @@ def write_run(analysis_ready_dir: Path, run_id: str, tables: dict[str, pd.DataFr
         df.to_parquet(run_dir / f"{table_name}.parquet")
 
     (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2, default=str))
+    if derived is not None:
+        (run_dir / "derived.json").write_text(json.dumps(derived, indent=2, default=str))
