@@ -24,13 +24,25 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 
-from pywerfl import workspace, write_data
+from pywerfl import schema, units, workspace, write_data
 from pywerfl.sources import designsafe_reference as reference
 
 SOURCE_NAME = "designsafe"
 RUN_ID_WIDTH = 4
 _EXCEL_EPOCH = datetime(1899, 12, 30)
-# _REFERENCE_TAPS = ("60001", "60002")
+
+_MET_HEIGHT_M = 3.9624
+_SONIC_HEIGHT_M = 9.144
+
+_TOWER_QUANTITIES = {
+    "North": "north",
+    "West": "west",
+    "Vertical": "vertical",
+    "Wind Speed": "wind_speed",
+    "Wind Direction": "wind_direction",
+    "Along Wind Comp.": "along_wind",
+    "Cross Wind Comp.": "cross_wind",
+}
 
 
 # --- Step 1 functions ---
@@ -146,17 +158,54 @@ def _excel_serial_to_datetime(serial: float) -> datetime:
 
 
 def _cp_column_names(reference_dir: Path) -> list[str]:
-    tap_ids = reference.load_cp_tap_ids(reference_dir)
-    return [t for t in tap_ids]
+    return reference.load_cp_tap_ids(reference_dir)
 
 
-def _read_labeled_csv(csv_path: Path, column_names: list[str]) -> pd.DataFrame:
+def _read_raw_csv(csv_path: Path, column_names: list[str]) -> pd.DataFrame:
     df = pd.read_csv(csv_path, header=None, names=column_names)
     df.index = pd.Index(df.index / 30.0, name="elapsed_seconds")
     return df
 
 
-def _load_run_metadata(stats_path: Path, run_id: str) -> dict:
+def _met_spec(names: list[str]) -> dict[str, tuple[str, str, str]]:
+    temp, rel_humidity, bar = names
+    return {
+        temp: ("temperature", "degF", "K"),
+        rel_humidity: ("relative_humidity", "%", "fraction"),
+        bar: ("barometric_pressure", "inHg", "kPa"),
+    }
+
+
+def _sonic_spec(names: list[str]) -> dict[str, tuple[str, str, str]]:
+    north, west, vertical, speed, direction, along, cross = names
+    return {
+        north: ("north", "mph", "m/s"),
+        west: ("west", "mph", "m/s"),
+        vertical: ("vertical", "mph", "m/s"),
+        speed: ("wind_speed", "mph", "m/s"),
+        direction: ("wind_direction", "deg", "deg"),
+        along: ("along_wind", "mph", "m/s"),
+        cross: ("cross_wind", "mph", "m/s"),
+    }
+
+
+def _tower_spec(names: list[str]) -> dict[str, tuple[str, str, str]]:
+    spec = {}
+    for name in names:
+        height, quantity = name.split(" ft ", 1)
+        canonical = _TOWER_QUANTITIES[quantity]
+        unit = "deg" if canonical == "wind_direction" else "mph"
+        target = "deg" if canonical == "wind_direction" else "m/s"
+        spec[name] = (f"{height}ft_{canonical}", unit, target)
+    return spec
+
+
+def _tower_heights_m(names: list[str]) -> dict[str, float]:
+    heights_ft = sorted({int(name.split(" ft ", 1)[0]) for name in names})
+    return {f"{h}ft": units.convert(h, "ft", "m") for h in heights_ft}
+
+
+def _load_run_metadata(stats_path: Path, run_id: str, tower_names: list[str]) -> dict:
     wb = openpyxl.load_workbook(stats_path, read_only=True, data_only=True)
     ws = wb["Summary"]
     fields = {}
@@ -182,10 +231,13 @@ def _load_run_metadata(stats_path: Path, run_id: str) -> dict:
         "source": SOURCE_NAME,
         "mode": fields.get("Mode"),
         "date_time": date_time,
-        "mean_wind_speed_mph": fields.get("Mean Wind Speed"),
+        "mean_wind_speed_ms": units.convert(fields.get("Mean Wind Speed"), "mph", "m/s"),
         "mean_wind_direction_deg": wind_direction,
         "angle_of_attack_deg": angle_of_attack,
         "building_position_deg": building_position,
+        "met_height_m": _MET_HEIGHT_M,
+        "sonic_height_m": _SONIC_HEIGHT_M,
+        "tower_heights_m": _tower_heights_m(tower_names),
     }
 
 
@@ -199,13 +251,18 @@ def transform_run(
     src_run = clean_dir / "runs" / clean_run_dirname(run_id)
     padded_id = padded_run_id(run_id)
 
+    cp_raw = _read_raw_csv(src_run / "cp.csv", cp_columns)
+    met_raw = _read_raw_csv(src_run / "met.csv", column_names["met"])
+    sonic_raw = _read_raw_csv(src_run / "sonic.csv", column_names["sonic"])
+    tower_raw = _read_raw_csv(src_run / "tower.csv", column_names["tower"])
+
     tables = {
-        "cp": _read_labeled_csv(src_run / "cp.csv", cp_columns),
-        "met": _read_labeled_csv(src_run / "met.csv", column_names["met"]),
-        "sonic": _read_labeled_csv(src_run / "sonic.csv", column_names["sonic"]),
-        "tower": _read_labeled_csv(src_run / "tower.csv", column_names["tower"]),
+        "cp": cp_raw,
+        "met": schema.build_table(met_raw, _met_spec(column_names["met"])),
+        "sonic": schema.build_table(sonic_raw, _sonic_spec(column_names["sonic"])),
+        "tower": schema.build_table(tower_raw, _tower_spec(column_names["tower"])),
     }
-    metadata = _load_run_metadata(src_run / "summary_statistics.xlsx", padded_id)
+    metadata = _load_run_metadata(src_run / "summary_statistics.xlsx", padded_id, column_names["tower"])
     write_data.write_run(analysis_ready_dir, padded_id, tables, metadata)
 
 
@@ -276,15 +333,12 @@ def main() -> None:
     column_names = reference.load_column_names(reference_dir)
     cp_columns = _cp_column_names(reference_dir)
 
-    tap_locations = reference.load_tap_locations(reference_dir)
-    tap_locations.to_csv(analysis_ready_dir / f"{SOURCE_NAME}_tap_locations.csv", index=False)
-
     print(f"Transforming {len(run_ids)} runs...")
     for run_id in run_ids:
         transform_run(clean_dir, analysis_ready_dir, run_id, column_names, cp_columns)
 
     print(f"\nDone. Wrote clean structure to {clean_dir}")
-    print(f"Wrote {len(run_ids)} runs + {SOURCE_NAME}_tap_locations.csv to {analysis_ready_dir}")
+    print(f"Wrote {len(run_ids)} runs to {analysis_ready_dir}")
 
 
 if __name__ == "__main__":
