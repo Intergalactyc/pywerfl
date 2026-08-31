@@ -18,6 +18,10 @@ dependencies = [
 
 [project.scripts]
 pywerfl-designsafe = "pywerfl.sources.designsafe:main"
+pywerfl-onerunsimple = "pywerfl.sources.onerunsimple:main"
 
 [tool.setuptools.packages.find]
 include = ["pywerfl*"]
+
+[tool.setuptools.package-data]
+pywerfl = ["reference_data/*.csv"]
