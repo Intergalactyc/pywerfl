@@ -19,7 +19,7 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 
-from pywerfl import schema, units, workspace, write_data
+from pywerfl import overrides, schema, units, workspace, write_data
 
 SOURCE_NAME = "onerunsimple"
 RUN_ID_WIDTH = 4
@@ -193,6 +193,11 @@ def main() -> None:
 
     flow_params_path = find_one(run_dir, f"Run{run_number}*flow parameters.xlsx")
     metadata, derived = _load_run_metadata(flow_params_path, padded_id, list(tower_raw.columns))
+
+    run_overrides = overrides.for_run(overrides.load(run_dir), padded_id)
+    if run_overrides:
+        metadata = schema.build_metadata({**metadata, **run_overrides})
+        print(f"Applied metadata overrides: {run_overrides}")
 
     write_data.write_run(analysis_ready_dir, padded_id, tables, metadata, derived=derived)
     print(f"Wrote run {padded_id} to {analysis_ready_dir}")

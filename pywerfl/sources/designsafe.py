@@ -24,7 +24,7 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 
-from pywerfl import schema, units, workspace, write_data
+from pywerfl import overrides, schema, units, workspace, write_data
 from pywerfl.sources import designsafe_reference as reference
 
 SOURCE_NAME = "designsafe"
@@ -247,6 +247,7 @@ def transform_run(
     run_id: str,
     column_names: dict[str, list[str]],
     cp_columns: list[str],
+    run_overrides: dict[str, dict],
 ) -> None:
     src_run = clean_dir / "runs" / clean_run_dirname(run_id)
     padded_id = padded_run_id(run_id)
@@ -263,6 +264,12 @@ def transform_run(
         "tower": schema.build_table(tower_raw, _tower_spec(column_names["tower"])),
     }
     metadata = _load_run_metadata(src_run / "summary_statistics.xlsx", padded_id, column_names["tower"])
+
+    overrides_for_run = overrides.for_run(run_overrides, padded_id)
+    if overrides_for_run:
+        metadata = schema.build_metadata({**metadata, **overrides_for_run})
+        print(f"Run {padded_id}: applied metadata overrides: {overrides_for_run}")
+
     write_data.write_run(analysis_ready_dir, padded_id, tables, metadata)
 
 
@@ -333,9 +340,11 @@ def main() -> None:
     column_names = reference.load_column_names(reference_dir)
     cp_columns = _cp_column_names(reference_dir)
 
+    run_overrides = overrides.load(source)
+
     print(f"Transforming {len(run_ids)} runs...")
     for run_id in run_ids:
-        transform_run(clean_dir, analysis_ready_dir, run_id, column_names, cp_columns)
+        transform_run(clean_dir, analysis_ready_dir, run_id, column_names, cp_columns, run_overrides)
 
     print(f"\nDone. Wrote clean structure to {clean_dir}")
     print(f"Wrote {len(run_ids)} runs to {analysis_ready_dir}")

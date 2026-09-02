@@ -33,6 +33,18 @@ For a single-run, already-flat, headered-CSV dataset (e.g. R647):
 python -m pywerfl.sources.onerunsimple <run_dir> [workspace]
 ```
 
+### Manual metadata overrides
+
+If a raw source is missing a `run.metadata` fact it just doesn't record (e.g. R647 has no `date_time` anywhere in its own files), or gets one wrong, put a `metadata_overrides.json` file directly in the raw source directory (the same directory passed to the ingestion CLI):
+
+```json
+{
+  "647": {"date_time": "2003-06-15T12:00:00"}
+}
+```
+
+Keyed by run ID; values are merged into that run's metadata on every ingestion. Unrecognized field names raise immediately.
+
 ### Unit and naming convention
 
 Every source converts its own raw units into a fixed SI-based set on ingestion, via `pywerfl.units`/`pywerfl.schema`: wind speeds in m/s, temperatures in K, pressures in kPa, lengths in m, angles in degrees, relative humidity and turbulence intensity as a fraction (0-1), Cp and related quantities dimensionless. Column names carry no unit suffix (the unit is always whatever's listed above) and are the same across sources for the same measurement. A table or tap may simply be absent for a source/run that doesn't measure it. met/sonic instrument height and tower's per-height mapping live in `run.metadata` (`met_height_m`, `sonic_height_m`, `tower_heights_m`) rather than in column names, since met/sonic are each a single location per table.
@@ -83,6 +95,27 @@ Wind-direction columns are detected automatically and get proper circular statis
 - `iso_blue_max`/`iso_blue_min`: non-exceedance P=0.80, extrapolated to a 60-minute reference period (ISO 4354 1-hour design peak convention)
 - `exp_blue_max`/`exp_blue_min`: non-exceedance P=0.5704 (the probability at which a Gumbel variate equals the distribution's mean), extrapolated to the record's own actual duration
     - A more statistically stable estimate of the real pressure peak over this record than the raw observed `min`/`max` values
+
+## Visualizing pressures over the building
+
+`pywerfl.viz` plots Cp maps over the building's 5 faces (roof + 4 walls), laid out as an "exploded view": roof in the center, wall 1 (North) left, wall 2 (East) top, wall 3 (South) right, wall 4 (West) bottom (positions per Figure 8 of `resources/WERFL_Data_Description.pdf`), with wall 1/3 rotated 90 degrees and stretched to the roof's left/right edge length - matching that PDF's Figure 9 "Flat View Report" layout rather than Figure 8's own unrotated schematic. Each wall's orientation (which end sits next to which neighbor) was verified empirically against real Cp corner-continuity, not just read off the figures - see the module docstring. Tap physical coordinates (`pywerfl.reference_data`) are used for cubic interpolation onto a smooth per-face map (nearest-neighbor fill outside the tap convex hull); an arrow shows the mean 13 ft wind speed/direction, anchored at whichever roof corner the wind strikes, and (when `building_position_deg` is known) an "N" indicator shows true North.
+
+```python
+from pywerfl import loader, viz
+
+run = loader.load_run("1851")
+
+viz.plot_pressure_map(run)                              # mean Cp, smooth interpolated map (default)
+viz.plot_pressure_map(run, stat="iso_blue_max")          # any summarizer.cp column
+viz.plot_pressure_map(run, time=123.4)                   # instantaneous snapshot, nearest sample
+viz.plot_pressure_map(run, show_points=True)             # overlay the raw tap locations
+viz.plot_pressure_map(run, interpolate=False)            # points only, no smooth map
+
+anim = viz.animate_pressure_map(run, max_frames=200)     # instantaneous Cp animated over the run
+anim.save("run1851.mp4")                                 # or display inline via anim.to_jshtml()
+```
+
+The wind-arrow and North-indicator angles are derived from the wall-numbering/AOA/building-position relationships (see the module docstring for the exact formulas), verified numerically against real run metadata: e.g. wind arrives from the direction of the windward wall's outward normal, `building_position_deg + 90*(wall_number-1)`.
 
 ## Some other notes and observations
 - Tap coordinates (`pywerfl.reference_data`) are fixed and bundled with the
