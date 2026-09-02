@@ -98,21 +98,24 @@ Wind-direction columns are detected automatically and get proper circular statis
 
 ## Visualizing pressures over the building
 
-`pywerfl.viz` plots Cp maps over the building's 5 faces (roof + 4 walls), laid out as an "exploded view": roof in the center, wall 1 (North) left, wall 2 (East) top, wall 3 (South) right, wall 4 (West) bottom (positions per Figure 8 of `resources/WERFL_Data_Description.pdf`), with wall 1/3 rotated 90 degrees and stretched to the roof's left/right edge length - matching that PDF's Figure 9 "Flat View Report" layout rather than Figure 8's own unrotated schematic. Each wall's orientation (which end sits next to which neighbor) was verified empirically against real Cp corner-continuity, not just read off the figures - see the module docstring. Tap physical coordinates (`pywerfl.reference_data`) are used for cubic interpolation onto a smooth per-face map (nearest-neighbor fill outside the tap convex hull); an arrow shows the mean 13 ft wind speed/direction, anchored at whichever roof corner the wind strikes, and (when `building_position_deg` is known) an "N" indicator shows true North.
+`pywerfl.viz` plots Cp maps over the building's 5 faces (roof + 4 walls), laid out as an "exploded view": roof in the center, wall 1 (North) left, wall 2 (East) top, wall 3 (South) right, wall 4 (West) bottom. Tap physical coordinates (`pywerfl.reference_data`) are used for cubic interpolation onto a smooth per-face map (nearest-neighbor fill outside the tap convex hull). An arrow shows the mean 13 ft wind speed/direction, anchored at whichever roof corner the wind strikes, and an "N" indicator shows true North.
 
 ```python
 from pywerfl import loader, viz
 
 run = loader.load_run("1851")
 
-viz.plot_pressure_map(run)                              # mean Cp, smooth interpolated map (default)
-viz.plot_pressure_map(run, stat="iso_blue_max")          # any summarizer.cp column
+viz.plot_pressure_map(run)                               # mean Cp, smooth interpolated map (default)
+viz.plot_pressure_map(run, stat="exp_blue_min")          # any summarizer.cp column
 viz.plot_pressure_map(run, time=123.4)                   # instantaneous snapshot, nearest sample
 viz.plot_pressure_map(run, show_points=True)             # overlay the raw tap locations
 viz.plot_pressure_map(run, interpolate=False)            # points only, no smooth map
 
 anim = viz.animate_pressure_map(run, max_frames=200)     # instantaneous Cp animated over the run
 anim.save("run1851.mp4")                                 # or display inline via anim.to_jshtml()
+
+viz.plot_tap_locations()                                 # reference tap IDs, same layout, no run/coloring needed
+viz.plot_tap_locations(alternate_labels=False)           # every label above its point, instead of alternating
 ```
 
 The wind-arrow and North-indicator angles are derived from the wall-numbering/AOA/building-position relationships (see the module docstring for the exact formulas), verified numerically against real run metadata: e.g. wind arrives from the direction of the windward wall's outward normal, `building_position_deg + 90*(wall_number-1)`.

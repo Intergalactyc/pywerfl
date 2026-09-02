@@ -133,10 +133,7 @@ def _resolve_values(run: Run, stat: str | None, time: float | None, values: pd.S
     return summarizer.summarize_run(run).cp[stat if stat is not None else "mean"]
 
 
-def _setup_axes(ax, layout, values):
-    vmax = np.nanmax(np.abs(values.to_numpy(dtype=float)))
-    vmax = vmax if vmax > 0 else 1.0
-    norm = TwoSlopeNorm(vcenter=0, vmin=-vmax, vmax=vmax)
+def _fit_axes_to_layout(ax, layout: dict) -> None:
     xs = [x0 for x0, y0, w, h in layout.values()] + [x0 + w for x0, y0, w, h in layout.values()]
     ys = [y0 for x0, y0, w, h in layout.values()] + [y0 + h for x0, y0, w, h in layout.values()]
     margin = 0.1 * max(max(xs) - min(xs), max(ys) - min(ys))
@@ -144,6 +141,13 @@ def _setup_axes(ax, layout, values):
     ax.set_ylim(min(ys) - margin, max(ys) + margin)
     ax.set_aspect("equal")
     ax.axis("off")
+
+
+def _setup_axes(ax, layout, values):
+    vmax = np.nanmax(np.abs(values.to_numpy(dtype=float)))
+    vmax = vmax if vmax > 0 else 1.0
+    norm = TwoSlopeNorm(vcenter=0, vmin=-vmax, vmax=vmax)
+    _fit_axes_to_layout(ax, layout)
     return norm
 
 
@@ -227,3 +231,50 @@ def animate_pressure_map(
         ax.set_title(f"Run {run.run_id} - t={frame_indices[i]:.2f}s")
 
     return FuncAnimation(fig, render, frames=len(frame_indices), interval=interval_ms)
+
+
+def plot_tap_locations(
+    wall_scale: float = 0.5,
+    gap: float = 3.0,
+    fontsize: float = 5,
+    alternate_labels: bool = True,
+    ax: plt.Axes | None = None,
+) -> plt.Figure:
+    """
+    Reference tap locations (pywerfl.reference_data) labeled with tap IDs.
+    TODO: allow passing a run to see which taps are instrumented?
+
+    alternate_labels: alternate each face's labels above/below their point by column, so labels
+    stagger horizontally without adjacent rows in the same column colliding; False puts every
+    label above its point.
+    """
+    locs = reference_data.load_tap_locations().set_index("tap_id")
+    extents = _face_extents()
+    layout = _face_layout(wall_scale, gap)
+
+    fig = None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 9))
+    _fit_axes_to_layout(ax, layout)
+
+    for surf, rect in layout.items():
+        x0, y0, w, h = rect
+        true_w, true_h = extents[surf]
+        face_taps = locs[locs.surface == surf]
+        frac_x, frac_y = _FACE_TRANSFORMS[surf](face_taps["x_ft"].to_numpy(), face_taps["y_ft"].to_numpy(), true_w, true_h)
+        px, py = x0 + frac_x * w, y0 + frac_y * h
+
+        ax.scatter(px, py, s=10, c="black", zorder=2)
+        # group by drawn (not raw) horizontal position - wall1/wall3 are transposed, so x_ft maps
+        # to the drawn vertical axis there, not horizontal
+        frac_x_rounded = np.round(frac_x, 6)
+        col_index = {v: i for i, v in enumerate(sorted(set(frac_x_rounded)))}
+        col_flip = np.array([col_index[v] % 2 == 1 for v in frac_x_rounded])
+        for tap_id, x, y, flip in zip(face_taps.index, px, py, col_flip):
+            below = alternate_labels and flip
+            ax.annotate(tap_id, (x, y), fontsize=fontsize, ha="center", va="top" if below else "bottom",
+                        xytext=(0, -4 if below else 4), textcoords="offset points", zorder=3)
+        ax.add_patch(Rectangle((x0, y0), w, h, fill=False, edgecolor="k", linewidth=1, zorder=1))
+
+    ax.set_title("Tap locations")
+    return fig or ax.figure
