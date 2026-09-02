@@ -15,7 +15,7 @@ from matplotlib.colors import TwoSlopeNorm
 from matplotlib.patches import Rectangle, FancyArrow
 from scipy.interpolate import griddata
 
-from pywerfl import reference_data, summarizer
+from pywerfl import qc, reference_data, summarizer
 from pywerfl.loader import Run
 
 
@@ -278,3 +278,33 @@ def plot_tap_locations(
 
     ax.set_title("Tap locations")
     return fig or ax.figure
+
+
+def plot_tap_diagnostic(run: Run, tap_id: str, bins: int = 50) -> plt.Figure:
+    """
+    Time series + histogram for one Cp tap, with diagnostic stats (mean/std/median/mad/min/max/
+    unique-value count) in the title, for inspecting a suspicious tap found by
+    pywerfl.qc.find_suspicious_taps. Pass a Run loaded with exclude_taps=False to see the true
+    raw signal even if this tap is already on the exclusion list.
+    """
+    series = run.cp[tap_id]
+    d = qc.tap_diagnostics(series)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+    ax1.plot(series.index, series, linewidth=0.5)
+    ax1.set_xlabel("elapsed_seconds")
+    ax1.set_ylabel("Cp")
+    ax1.set_title("Time series")
+
+    ax2.hist(series.dropna(), bins=bins)
+    ax2.set_xlabel("Cp")
+    ax2.set_ylabel("count")
+    ax2.set_title("Histogram")
+
+    stats_line = (
+        f"mean={d['mean']:.3f}  std={d['std']:.3f}  median={d['median']:.3f}  mad={d['mad']:.3f}  "
+        f"min={d['min']:.3f}  max={d['max']:.3f}  unique={d['n_unique']} ({d['unique_frac']:.1%})"
+    )
+    fig.suptitle(f"Run {run.run_id} - tap {tap_id}\n{stats_line}")
+    fig.tight_layout()
+    return fig

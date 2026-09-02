@@ -120,6 +120,33 @@ viz.plot_tap_locations(alternate_labels=False)           # every label above its
 
 The wind-arrow and North-indicator angles are derived from the wall-numbering/AOA/building-position relationships (see the module docstring for the exact formulas), verified numerically against real run metadata: e.g. wind arrives from the direction of the windward wall's outward normal, `building_position_deg + 90*(wall_number-1)`.
 
+## Cp tap data quality
+
+Some taps have bad data for a given run (e.g. a stuck or glitching pressure sensor); `pywerfl.qc` helps find and exclude them.
+
+**Manual exclusion list**: put a `tap_exclusions.json` file directly in the workspace root (a sibling of `analysis_ready/`, e.g. `~/.pywerfl/tap_exclusions.json` by default) - unlike `analysis_ready/`/`clean/` this isn't regenerable, so don't delete it along with those. Format:
+
+```json
+{
+  "0647": ["50505"]
+}
+```
+
+`loader.load_run` NaNs out listed taps automatically (`exclude_taps=True` by default); pass `exclude_taps=False` to see the true raw signal.
+
+**Finding candidates and reviewing them**:
+
+```python
+from pywerfl import loader, qc, viz
+
+run = loader.load_run("0647", exclude_taps=False)     # raw, so nothing already excluded hides itself
+candidates = qc.find_suspicious_taps(run)             # flags implausible |mean| or suspiciously few unique values
+candidates                                            # mean/std/min/max/median/mad/n_unique/unique_frac/flags, worst first
+viz.plot_tap_diagnostic(run, "50505")                 # side-by-side time series + histogram, stats in the title
+```
+
+`find_suspicious_taps`'s two heuristics (implausible magnitude, low unique-value count) are simple and imperfect. Always look at the actual signal with `plot_tap_diagnostic` before excluding: a real windward-corner tap under an oblique wind can legitimately show a large, unique-value-poor extreme, while a stuck sensor looks like near-zero variance around a physically implausible offset. The exclusion list is meant to be the manually reviewed+confirmed result. `find_suspicious_taps` only proposes candidates, it never writes to the list itself.
+
 ## Some other notes and observations
 - Tap coordinates (`pywerfl.reference_data`) are fixed and bundled with the
   package; which taps are actually instrumented (i.e. present as columns) can still vary by source/run
@@ -136,6 +163,7 @@ The wind-arrow and North-indicator angles are derived from the wall-numbering/AO
 - When checking different sources for the BLUE coefficients, a transcription error was caught in NIST's bluecoeff.m (at n=15, a_2 = 0.119134 there vs. the correct 0.119314 used here).
     - Compared NIST source at https://www.itl.nist.gov/div898/winds/gumbel_blue/gumbblue.htm as well as an MIT-made source at github.com/kikocorreoso/scikit-extremes
     - Found error while cross-checking against sum(a)=1 and sum(b)=0 unbiasedness identities
+- For run 647, taps 50505 and 21508 were flagged for low unique values. 50505 also has implausibly high readings (Cp stuck around ~5), excluding as bad; however, 21508 just has very low variance and otherwise looks realistic. Taps 50345 and 50045 also flagged for implausible magnitude, but signals look normal, just extra negative (they are at the windward corner, so it seems to be a real vortex suction effect).
 
 ### DesignSafe
 - At least here, there are some mislabeled taps in the "Cp File Structure" file; after some investigation of the naming structure and the unused taps in the "tap_locations" file, the correct values were identified. Corrections are made in `sources.designsafe_reference`, more details are included there in corresponding comments.

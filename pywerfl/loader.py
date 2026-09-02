@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from pywerfl import workspace
+from pywerfl import qc, workspace
 
 
 def _resolve_analysis_ready_dir(analysis_ready_dir: Path | None) -> Path:
@@ -64,7 +64,12 @@ def list_runs(analysis_ready_dir: Path | None = None) -> list[str]:
     )
 
 
-def load_run(run_id: int | str, analysis_ready_dir: Path | None = None) -> Run:
+def load_run(run_id: int | str, analysis_ready_dir: Path | None = None, exclude_taps: bool = True) -> Run:
+    """
+    exclude_taps: NaN out any cp columns listed in <workspace>/tap_exclusions.json for this run
+    (see pywerfl.qc); on by default. Pass False to see the true raw signal, e.g. when auditing a
+    tap with pywerfl.qc.find_suspicious_taps or pywerfl.viz.plot_tap_diagnostic.
+    """
     analysis_ready_dir = _resolve_analysis_ready_dir(analysis_ready_dir)
     run_id = _resolve_run_id(run_id, analysis_ready_dir)
     run_dir = analysis_ready_dir / f"run_{run_id}"
@@ -72,4 +77,12 @@ def load_run(run_id: int | str, analysis_ready_dir: Path | None = None) -> Run:
     derived_path = run_dir / "derived.json"
     derived = json.loads(derived_path.read_text()) if derived_path.exists() else {}
     tables = {p.stem: pd.read_parquet(p) for p in sorted(run_dir.glob("*.parquet"))}
+
+    if exclude_taps and "cp" in tables:
+        excluded = [t for t in qc.excluded_taps(analysis_ready_dir.parent, run_id) if t in tables["cp"].columns]
+        if excluded:
+            tables["cp"] = tables["cp"].copy()
+            tables["cp"][excluded] = float("nan")
+            print(f"Run {run_id}: excluded taps {excluded}")
+
     return Run(run_id=run_id, metadata=metadata, derived=derived, tables=tables)
