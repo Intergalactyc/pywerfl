@@ -110,8 +110,12 @@ viz.plot_pressure_map(run, stat="exp_blue_min")          # any summarizer.cp col
 viz.plot_pressure_map(run, time=123.4)                   # instantaneous snapshot, nearest sample
 viz.plot_pressure_map(run, show_points=True)             # overlay the raw tap locations
 viz.plot_pressure_map(run, interpolate=False)            # points only, no smooth map
+viz.plot_pressure_map(run, percentile=(5, 95))           # tighter/looser color-scale percentile (default: 1st/99th of the plotted values)
+viz.plot_pressure_map(run, cp_range=(-2, 1))             # or an explicit (vmin, vmax) instead of a percentile
 
-anim = viz.animate_pressure_map(run, max_frames=200)     # instantaneous Cp animated over the run
+anim = viz.animate_pressure_map(run, max_frames=200)     # instantaneous Cp animated over the run, one fixed colorbar (1st/99th percentile of the whole run, by default)
+anim = viz.animate_pressure_map(run, percentile=(5, 95)) # same percentile/cp_range options as plot_pressure_map, but over the whole run
+anim = viz.animate_pressure_map(run, cp_range=(-2, 1))
 anim.save("run1851.mp4")                                 # or display inline via anim.to_jshtml()
 
 viz.plot_tap_locations()                                 # reference tap IDs, same layout, no run/coloring needed
@@ -128,7 +132,7 @@ Some taps have bad data for a given run (e.g. a stuck or glitching pressure sens
 
 ```json
 {
-  "0647": ["50505"]
+  "0647": ["50505", "53020]
 }
 ```
 
@@ -164,6 +168,7 @@ viz.plot_tap_diagnostic(run, "50505")                 # side-by-side time series
     - Compared NIST source at https://www.itl.nist.gov/div898/winds/gumbel_blue/gumbblue.htm as well as an MIT-made source at github.com/kikocorreoso/scikit-extremes
     - Found error while cross-checking against sum(a)=1 and sum(b)=0 unbiasedness identities
 - For run 647, taps 50505 and 21508 were flagged for low unique values. 50505 also has implausibly high readings (Cp stuck around ~5), excluding as bad; however, 21508 just has very low variance and otherwise looks realistic. Taps 50345 and 50045 also flagged for implausible magnitude, but signals look normal, just extra negative (they are at the windward corner, so it seems to be a real vortex suction effect).
+    - After looking at series and animation, it looks like 53020 may also be malfunctioning, recommend exclusion. (Minimum Cp of 0.4, never negative, consistently significantly higher than neighbors)
 
 ### DesignSafe
 - At least here, there are some mislabeled taps in the "Cp File Structure" file; after some investigation of the naming structure and the unused taps in the "tap_locations" file, the correct values were identified. Corrections are made in `sources.designsafe_reference`, more details are included there in corresponding comments.

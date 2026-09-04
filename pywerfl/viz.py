@@ -3,17 +3,6 @@ Pressure-coefficient map visualization over the building's 5 faces.
 
 Layout ("exploded view": roof center, wall1 left, wall2 top, wall3 right, wall4 bottom) follows
 Figure 9 of the WERFL Data Description PDF (resources/WERFL_Data_Description.pdf, p.27).
-
-Per-face orientation (which tap-coordinate end of each wall, and which roof edge, sits next to
-which neighbor) was determined empirically via direct mean-Cp value continuity at each corner
-(not just matching sign/rank), cross-checked across four runs spanning very different AOA
-(276, 2292, 2637, 647) - a single near-zero-AOA run gives too weak/ambiguous a signal to trust
-alone. Result: wall1's x_ft=max end and wall3's x_ft=min end are both adjacent to wall4; wall1's
-x_ft=min end and wall3's x_ft=max end are adjacent to wall2. wall2's x_ft=max end is adjacent to
-wall1, x_ft=min to wall3. The roof's y_ft=max edge is adjacent to wall1, y_ft=min to wall3,
-x_ft=max to wall2, x_ft=min to wall4 - since wall1/wall3 are rotated 90 degrees into the left/right
-slots, the roof must be rotated the same way (a transpose) to stay geometrically consistent with
-them, not left as an identity mapping.
 """
 
 from __future__ import annotations
@@ -154,12 +143,14 @@ def _fit_axes_to_layout(ax, layout: dict) -> None:
     ax.axis("off")
 
 
-def _setup_axes(ax, layout, values):
-    vmax = np.nanmax(np.abs(values.to_numpy(dtype=float)))
-    vmax = vmax if vmax > 0 else 1.0
-    norm = TwoSlopeNorm(vcenter=0, vmin=-vmax, vmax=vmax)
-    _fit_axes_to_layout(ax, layout)
-    return norm
+def _resolve_norm(values, percentile: tuple[float, float], cp_range: tuple[float, float] | None) -> TwoSlopeNorm:
+    """Color-scale norm, centered at 0. `cp_range` (vmin, vmax) takes priority if given, else
+    computed from `percentile` of `values` - robust to a rare extreme value dominating the scale."""
+    if cp_range is not None:
+        vmin, vmax = cp_range
+    else:
+        vmin, vmax = np.nanpercentile(np.asarray(values, dtype=float), percentile)
+    return TwoSlopeNorm(vcenter=0, vmin=min(vmin, -1e-9), vmax=max(vmax, 1e-9))
 
 
 def plot_pressure_map(
@@ -174,6 +165,8 @@ def plot_pressure_map(
     resolution: int = 60,
     arrow_scale: float = 0.4,
     cmap: str = "RdBu_r",
+    percentile: tuple[float, float] = (1, 99),
+    cp_range: tuple[float, float] | None = None,
     ax: plt.Axes | None = None,
 ) -> plt.Figure:
     """
@@ -187,7 +180,8 @@ def plot_pressure_map(
     fig = None
     if ax is None:
         fig, ax = plt.subplots(figsize=(9, 9))
-    norm = _setup_axes(ax, layout, v)
+    _fit_axes_to_layout(ax, layout)
+    norm = _resolve_norm(v.to_numpy(dtype=float), percentile, cp_range)
 
     for surf, rect in layout.items():
         _draw_face(ax, surf, locs[locs.surface == surf], v, rect, extents[surf], cmap, norm, interpolate, show_points, resolution)
@@ -219,8 +213,12 @@ def animate_pressure_map(
     arrow_scale: float = 0.4,
     cmap: str = "RdBu_r",
     interval_ms: int = 50,
+    percentile: tuple[float, float] = (1, 99),
+    cp_range: tuple[float, float] | None = None,
 ) -> FuncAnimation:
-    """Animated Cp map over run.cp's full time series. Returns a matplotlib FuncAnimation."""
+    """
+    Animated Cp map over run.cp's full time series. Returns a matplotlib FuncAnimation.
+    """
     cp = run.cp
     stride = stride if stride is not None else max(1, len(cp) // max_frames)
     frame_indices = cp.index[::stride]
@@ -230,7 +228,9 @@ def animate_pressure_map(
     layout = _face_layout(wall_scale, gap)
 
     fig, ax = plt.subplots(figsize=(9, 9))
-    norm = _setup_axes(ax, layout, cp.stack())
+    _fit_axes_to_layout(ax, layout)
+
+    norm = _resolve_norm(cp.to_numpy(), percentile, cp_range)
 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     fig.colorbar(sm, ax=ax, shrink=0.7, label="Cp")  # own axes, unaffected by ax.clear() below - one colorbar for the whole animation
