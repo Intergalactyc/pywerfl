@@ -3,6 +3,17 @@ Pressure-coefficient map visualization over the building's 5 faces.
 
 Layout ("exploded view": roof center, wall1 left, wall2 top, wall3 right, wall4 bottom) follows
 Figure 9 of the WERFL Data Description PDF (resources/WERFL_Data_Description.pdf, p.27).
+
+Per-face orientation (which tap-coordinate end of each wall, and which roof edge, sits next to
+which neighbor) was determined empirically via direct mean-Cp value continuity at each corner
+(not just matching sign/rank), cross-checked across four runs spanning very different AOA
+(276, 2292, 2637, 647) - a single near-zero-AOA run gives too weak/ambiguous a signal to trust
+alone. Result: wall1's x_ft=max end and wall3's x_ft=min end are both adjacent to wall4; wall1's
+x_ft=min end and wall3's x_ft=max end are adjacent to wall2. wall2's x_ft=max end is adjacent to
+wall1, x_ft=min to wall3. The roof's y_ft=max edge is adjacent to wall1, y_ft=min to wall3,
+x_ft=max to wall2, x_ft=min to wall4 - since wall1/wall3 are rotated 90 degrees into the left/right
+slots, the roof must be rotated the same way (a transpose) to stay geometrically consistent with
+them, not left as an identity mapping.
 """
 
 from __future__ import annotations
@@ -27,8 +38,8 @@ def _face_extents() -> dict[str, tuple[float, float]]:
 
 # (x_ft, y_ft, true_w, true_h) -> (frac_x, frac_y) in [0,1]x[0,1], per face
 _FACE_TRANSFORMS = {
-    "roof": lambda x, y, w, h: (x / w, y / h),
-    "wall1": lambda x, y, w, h: (y / h, x / w),         # transpose: length -> vertical, height -> horizontal
+    "roof": lambda x, y, w, h: (1 - y / h, x / w),      # transpose + flip: rotated the same way as wall1/wall3
+    "wall1": lambda x, y, w, h: (y / h, 1 - x / w),     # transpose + flip (x_ft=max end -> bottom, toward wall4)
     "wall3": lambda x, y, w, h: (1 - y / h, x / w),     # transpose + flip (roofline faces left, toward roof)
     "wall2": lambda x, y, w, h: (1 - x / w, y / h),     # flip (wall1-adjacent end -> left, toward wall1)
     "wall4": lambda x, y, w, h: (x / w, y / h),
@@ -221,9 +232,12 @@ def animate_pressure_map(
     fig, ax = plt.subplots(figsize=(9, 9))
     norm = _setup_axes(ax, layout, cp.stack())
 
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    fig.colorbar(sm, ax=ax, shrink=0.7, label="Cp")  # own axes, unaffected by ax.clear() below - one colorbar for the whole animation
+
     def render(i):
         ax.clear()
-        _setup_axes(ax, layout, cp.stack())
+        _fit_axes_to_layout(ax, layout)
         v = cp.loc[frame_indices[i]]
         for surf, rect in layout.items():
             _draw_face(ax, surf, locs[locs.surface == surf], v, rect, extents[surf], cmap, norm, interpolate, show_points, resolution)

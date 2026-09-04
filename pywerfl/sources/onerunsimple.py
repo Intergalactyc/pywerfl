@@ -128,6 +128,7 @@ def _load_run_metadata(flow_params_path: Path, run_id: str, tower_names: list[st
         "angle_of_attack_deg": p["Angleofattack"],
         "mean_wind_speed_ms": units.convert(p["Ref.Velocity"], "mph", "m/s"),
         "mean_wind_direction_deg": p["Ref.Dir"],
+        "building_position_deg": (p["Ref.Dir"] - p["Angleofattack"]) % 360,
         "met_height_m": _MET_HEIGHT_M,
         "sonic_height_m": _SONIC_HEIGHT_M,
         "tower_heights_m": _tower_heights_m(tower_names),

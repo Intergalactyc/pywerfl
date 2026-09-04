@@ -172,5 +172,6 @@ viz.plot_tap_diagnostic(run, "50505")                 # side-by-side time series
 ### onerunsimple
 - For single-run datasets already saved as flat, headered CSVs (e.g. R647) - no reference workbook or clean/ intermediate needed, so this source's ingestion is a single pass to analysis-ready format.
 - `FlowPara.Alpha` is the power-law *index* n = 1/alpha, a convention used in some older literature; `power_law_alpha` (in `run.derived`) is computed as its reciprocal (R647 value of ~7.6 becomes ~0.132), with the untransformed source value kept as `power_law_index_raw`.
+- `building_position_deg` isn't given directly by this source either, but it is automatically computed on ingestion as `(mean_wind_direction_deg - angle_of_attack_deg) % 360`.
 - Unclear what ZoTurb and ShearVelocity are
     - ShearVelocity disagrees with FlowPara.Ustar
