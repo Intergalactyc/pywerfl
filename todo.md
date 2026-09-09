@@ -1,0 +1,5 @@
+- Identify, and add overrides with, Run 647's time, date, and mode
+- Look at pressure coefficient spectra
+- Correlation functionality in a script rather than custom building in notebooks
+- Other run ingestion (e.g. the SQL database with old runs, sent by Dr. Smith)
+- Update exclusion print functionality (switch to disable printing on each load?)
