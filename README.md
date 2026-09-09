@@ -100,6 +100,8 @@ Wind-direction columns are detected automatically and get proper circular statis
 
 `pywerfl.viz` plots Cp maps over the building's 5 faces (roof + 4 walls), laid out as an "exploded view": roof in the center, wall 1 (North) left, wall 2 (East) top, wall 3 (South) right, wall 4 (West) bottom. Tap physical coordinates (`pywerfl.reference_data`) are used for cubic interpolation onto a smooth per-face map (nearest-neighbor fill outside the tap convex hull). An arrow shows the mean 13 ft wind speed/direction, anchored at whichever roof corner the wind strikes, and an "N" indicator shows true North.
 
+Note that in order to save an animated pressure map efficiently/to typical video formats (e.g. MP4), you will need [FFMPEG](https://ffmpeg.org/) installed and on your system PATH. Without this, only GIF formats can be output.
+
 ```python
 from pywerfl import loader, viz
 

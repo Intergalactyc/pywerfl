@@ -165,7 +165,7 @@ def plot_pressure_map(
     resolution: int = 60,
     arrow_scale: float = 0.4,
     cmap: str = "RdBu_r",
-    percentile: tuple[float, float] = (1, 99),
+    percentile: tuple[float, float] = (0, 100),
     cp_range: tuple[float, float] | None = None,
     ax: plt.Axes | None = None,
 ) -> plt.Figure:
@@ -213,7 +213,7 @@ def animate_pressure_map(
     arrow_scale: float = 0.4,
     cmap: str = "RdBu_r",
     interval_ms: int = 50,
-    percentile: tuple[float, float] = (1, 99),
+    percentile: tuple[float, float] = (0, 100),
     cp_range: tuple[float, float] | None = None,
 ) -> FuncAnimation:
     """
@@ -296,10 +296,9 @@ def plot_tap_locations(
 
 def plot_tap_diagnostic(run: Run, tap_id: str, bins: int = 50) -> plt.Figure:
     """
-    Time series + histogram for one Cp tap, with diagnostic stats (mean/std/median/mad/min/max/
-    unique-value count) in the title, for inspecting a suspicious tap found by
-    pywerfl.qc.find_suspicious_taps. Pass a Run loaded with exclude_taps=False to see the true
-    raw signal even if this tap is already on the exclusion list.
+    Time series + histogram for one Cp tap, with diagnostic stats in the title.
+    For inspecting a specific tap, such as a suspicious tap found by pywerfl.qc.find_suspicious_taps.
+    Pass a Run loaded with exclude_taps=False to see the true raw signal even if this tap is already on the exclusion list.
     """
     series = run.cp[tap_id]
     d = qc.tap_diagnostics(series)
